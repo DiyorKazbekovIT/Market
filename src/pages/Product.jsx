@@ -1,8 +1,26 @@
-import React, { Fragment, useState, useEffect } from 'react'
+import React, { Fragment, useState, useEffect, useReducer } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import Cart from "../components/Cart"
 import axios from 'axios';
 import { useCart } from 'react-use-cart';
+
+const reducer = (state, action) => {
+    switch(action?.type){
+        case "GET":
+        return { ...state, product: action?.product }
+        case "ERROR":
+            return {...state, product: {}, shortData: [] }
+        case "SHORT":
+        const array = action?.products.filter(item => {
+            return item.id != action?.paramsId ||  
+                item?.id != action?.product?.id
+        }).slice(0, 3);
+
+        return { ...state, shortData: array }
+            default:
+                throw new Error(`Uknown action type ${action?.type}`)
+    }
+}
 
 const Product = () => {
     const { id } = useParams();
@@ -10,34 +28,43 @@ const Product = () => {
     const [ShortData, setShortData] = useState([]);
     const { addItem } = useCart();
 
+    const [state, dispatch] = useReducer(reducer, { product: {}, shortData:[], paramsId: id });
+
     useEffect(() => {
         try {
             axios.get(`http://localhost:9000/product/${id}`)
                 .then(response => {
                     const data = response.data;
-                    setProduct(data);
+                    // setProduct(data);
+                    dispatch({type: "GET", product: data})
                 })
             axios.get(`http://localhost:9000/product`)
                 .then(response => {
-                    setShortData([...response.data]);
+                    // setShortData([...response.data]);
+                    dispatch({
+                        type: "SHORT", 
+                        products: [...response.data],
+                        paramsId: id,
+                    })
                 })
         } catch (error) {
             console.error(error?.message);
+            dispatch({type: "ERROR"})
         }
-    }, [id, Product?.id, ShortData.length]);
+    }, [id, state?.product?.id, state?.shortData?.length]);
 
     const handleClick = () => {
-        alert(`Товар: ${Product?.title} добавлено в карзину`)
+        alert(`Товар: ${state?.product?.title} добавлено в карзину`)
         // console.log(Product);
 
-        addItem({ ...Product, quantity: 1 });
+        addItem({ ...state?.product, quantity: 1 });
 
         setTimeout(() => {
             window.location.replace("/bag");
         }, 500)
     }
 
-    const description = Product?.description?.map((text, id) => {
+    const description = state?.product?.description?.map((text, id) => {
         return (
             <p key={id}>
                 {text}
@@ -45,11 +72,7 @@ const Product = () => {
         )
     })
 
-    const shortItem = ShortData
-        .filter(item => (
-            item.id != id || item.id != Product.id
-        ))
-        .slice(0, 3)
+    const shortItem = state?.shortData
         .map(product => {
             return (
                 <Fragment key={product.id}>
@@ -70,16 +93,16 @@ const Product = () => {
                     <div className="Container">
                         <div className="main__row main__product-row">
                             <div className="main__imageholder">
-                                <img src={Product.image} alt="error" />
+                                <img src={state?.product.image} alt="error" />
                             </div>
 
                             <div className="main__content">
                                 <h2 className="title-2 main__title">
-                                    {Product.title}
+                                    {state?.product.title}
                                 </h2>
 
                                 <p className="price main__price">
-                                    {Product.price}
+                                    {state?.product.price}
                                     <small className="currency-price"> руб.</small>
                                 </p>
 
@@ -94,7 +117,7 @@ const Product = () => {
                                 </div>
 
                                 <div className="back">
-                                    <Link to={"/"} className='back__link'>Назад</Link>
+                                    <Link to={"/Market"} className='back__link'>Назад</Link>
                                 </div>
                             </div>
                         </div>
